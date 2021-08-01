@@ -1,5 +1,5 @@
 #include <SFML/Graphics.hpp>
-#include "Boid.hpp"
+#include "../include/Boid.hpp"
 #include <iostream>
 #include <unistd.h>
 #include <math.h>
