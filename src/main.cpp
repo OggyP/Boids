@@ -22,7 +22,7 @@ int main()
     const float viewAmt = 2;
     const float alwaysAvoid = 3;
     const float borderDeflectionScale = 0.005;
-    const float maxMagnitude = 0.5;
+    const float maxMagnitude = 0.75 ;
     const float collisionAvoidanceDistance = 17;
     const float avoidanceScale = 0.002;
     const float flockDetectionRadius = 50;
@@ -30,6 +30,7 @@ int main()
     const float cohesionAmt = 0.00004;
 
     bool showNums = false;
+    bool collisionAvoidance = true;
 
     int boidAmt;
     cout << "How many boids should be displayed? \n";
@@ -83,6 +84,16 @@ int main()
             showNums = false;
         }
 
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::C))
+        {
+            collisionAvoidance = true;
+        }
+
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::V))
+        {
+            collisionAvoidance = false;
+        }
+
         window.clear();
 
         for (int i = 0; i < boidAmt; i++) {
@@ -115,8 +126,8 @@ int main()
                         }
                     }
 
-                    // Avoid other boids code
-                    if (distanceToBoid < collisionAvoidanceDistance) {
+                    // // Avoid other boids code
+                    if (distanceToBoid < collisionAvoidanceDistance && collisionAvoidance) {
                         const float boidDirection = boid.direction();
                         if (directionToBoid > boidDirection - viewAmt && directionToBoid < boidDirection + viewAmt) {
                             if (directionToBoid > boidDirection) {
@@ -184,7 +195,7 @@ int main()
 
             if (boidsInFlockRange > 0) {
                 boid.vector[0] += cohesionAmt * ((averageFlockCords[0] / boidsInFlockRange) - boid.cordinates[0]);
-                boid.vector[1] += cohesionAmt * ((averageFlockCords[0] / boidsInFlockRange) - boid.cordinates[1]);
+                boid.vector[1] += cohesionAmt * ((averageFlockCords[1] / boidsInFlockRange) - boid.cordinates[1]);
             }
             
             boid.move();
@@ -204,7 +215,7 @@ int main()
                 drawBoidID.setPosition(boid.cordinates[0], boid.cordinates[1]);
                 window.draw(drawBoidID);
             }
-        } 
+        }
          
         window.display();
     }

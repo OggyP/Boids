@@ -12,8 +12,8 @@ class Boid {
         double distanceToCenter = 400;
         // move the cordinates by the vector
         void move() {
-            cordinates[0] += vector[0] + ((rand() % 6) - 3) / 20;
-            cordinates[1] += vector[1] + ((rand() % 6) - 3) / 20;
+            cordinates[0] += vector[0] + ((rand() % 6) - 3) / 10;
+            cordinates[1] += vector[1] + ((rand() % 6) - 3) / 10;
         };
 
         double direction() {
