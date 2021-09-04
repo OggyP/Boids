@@ -3,41 +3,148 @@
 #include <iostream>
 #include <unistd.h>
 #include <math.h>
+#include <thread>
 
 using namespace std;
 
 const double PI = 3.141592653589793238463;
 
+const int windowWidth = 1100;
+const int windowHeight = 1100;
+
+// Draw scale
+const float boidDrawScale = 3;
+const float vectorDrawScale = 22;
+
+// Setting scales
+// radians are bad, but it uses them
+const float viewAmt = 2;
+const float alwaysAvoid = 3;
+const float borderDeflectionScale = 0.005;
+const float maxMagnitude = 0.75 ;
+const float collisionAvoidanceDistance = 17;
+const float avoidanceScale = 0.002;
+const float flockDetectionRadius = 50;
+const float alignmentScale = 0.01;
+const float cohesionAmt = 0.00004;
+
+bool showNums = false;
+bool collisionAvoidance = true;
+
+const int boidAmt = 1500;
+Boid boidList[boidAmt];
+
+void calcBoid(int startAmt, int inc) {
+for (int i = startAmt; i < boidAmt; i += inc) {
+    Boid &boid = boidList[i];
+
+    // Flock variables
+    int boidsInFlockRange = 0;
+    double totalFlockVector[2] = {0, 0};
+    double averageFlockCords[2] = {0, 0}; 
+
+    for (int j = 0; j < boidAmt; j++) {
+        Boid &boidToCheck = boidList[j];
+
+        if (boid.boidNumber != boidToCheck.boidNumber) {
+            const double vectorToBoid[2] = {boidToCheck.cordinates[0] - boid.cordinates[0], boidToCheck.cordinates[1] - boid.cordinates[1]};
+            const double distanceToBoid = sqrt(pow(vectorToBoid[0], 2) + pow(vectorToBoid[1], 2));
+            double directionToBoid = atan(vectorToBoid[0] / vectorToBoid[1]);
+            if (vectorToBoid[1] < 0) {
+                if (vectorToBoid[1] == 0) {
+                    if (vectorToBoid[0] > 0) {
+                        directionToBoid = PI / 2;
+                    } else {
+                        directionToBoid = -PI / 2;
+                    }
+                }
+                else if (vectorToBoid[0] > 0) {
+                    directionToBoid = PIlib / 2 + (PIlib / 2 + directionToBoid);
+                } else {
+                    directionToBoid = - (PIlib / 2) - (PIlib / 2 - directionToBoid);
+                }
+            }
+
+            // // Avoid other boids code
+            if (distanceToBoid < collisionAvoidanceDistance && collisionAvoidance) {
+                const float boidDirection = boid.direction();
+                if (directionToBoid > boidDirection - viewAmt && directionToBoid < boidDirection + viewAmt) {
+                    if (directionToBoid > boidDirection) {
+                        boid.setVector(boidDirection - ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
+                    } else {
+                        boid.setVector(boidDirection + ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
+                    }
+                } 
+                else if (PI + directionToBoid + PI - boidDirection < viewAmt) {
+                    boid.setVector(boidDirection - ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
+                }
+                else if (PI - directionToBoid + PI + boidDirection < viewAmt) {
+                    boid.setVector(boidDirection + ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
+                } else if (distanceToBoid < alwaysAvoid) {
+                    if (directionToBoid > boidDirection) {
+                        boid.setVector(boidDirection - ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
+                    } else {
+                        boid.setVector(boidDirection + ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
+                    }
+                }
+            }
+
+            if (distanceToBoid < flockDetectionRadius) {
+                boidsInFlockRange ++;
+                totalFlockVector[0] += boidToCheck.vector[0];
+                totalFlockVector[1] += boidToCheck.vector[1];
+                averageFlockCords[0] += boidToCheck.cordinates[0];
+                averageFlockCords[1] += boidToCheck.cordinates[1];
+            }
+        }
+    }
+
+    if (boidsInFlockRange > 0) {
+        boid.vector[0] += ((totalFlockVector[0] / boidsInFlockRange) -  boid.vector[0]) * alignmentScale;
+        boid.vector[1] += ((totalFlockVector[1] / boidsInFlockRange) -  boid.vector[1]) * alignmentScale;
+        boid.vector[0] += boid.vector[0] * alignmentScale;
+        boid.vector[1] += boid.vector[1] * alignmentScale;
+    }
+
+    const double distanceToCenter = sqrt(pow((double)(boid.cordinates[0] - windowWidth / 2), (double)2) + pow((double)(boid.cordinates[1] - windowHeight / 2), (double)2));
+
+    if (distanceToCenter > 450) {
+        if (boid.cordinates[0] < windowWidth / 2) {
+            // left x
+            boid.vector[0] += borderDeflectionScale;
+        } else {
+            boid.vector[0] -= borderDeflectionScale;
+        }
+        if (boid.cordinates[1] < windowHeight / 2) {
+            // left x
+            boid.vector[1] += borderDeflectionScale;
+        } else {
+            boid.vector[1] -= borderDeflectionScale;
+        }
+        // for cicle thingo
+        // if (boid.distanceToCenter < distanceToCenter) {
+        //     boid.setVector(boid.direction() + borderDeflectionScale, maxMagnitude);
+        //     boid.distanceToCenter = distanceToCenter;
+        // }
+    }
+
+    if (boid.magnitude() > maxMagnitude) {
+        boid.setVector(boid.direction(), maxMagnitude);
+    }
+
+    if (boidsInFlockRange > 0) {
+        boid.vector[0] += cohesionAmt * ((averageFlockCords[0] / boidsInFlockRange) - boid.cordinates[0]);
+        boid.vector[1] += cohesionAmt * ((averageFlockCords[1] / boidsInFlockRange) - boid.cordinates[1]);
+    }
+    
+    boid.move();
+
+}
+
+}
+
 int main()
 {
-    const int windowWidth = 1100;
-    const int windowHeight = 1100;
-
-    // Draw scale
-    const float boidDrawScale = 3;
-    const float vectorDrawScale = 22;
-    
-    // Setting scales
-    // radians are bad, but it uses them
-    const float viewAmt = 2;
-    const float alwaysAvoid = 3;
-    const float borderDeflectionScale = 0.005;
-    const float maxMagnitude = 0.75 ;
-    const float collisionAvoidanceDistance = 17;
-    const float avoidanceScale = 0.002;
-    const float flockDetectionRadius = 50;
-    const float alignmentScale = 0.01;
-    const float cohesionAmt = 0.00004;
-
-    bool showNums = false;
-    bool collisionAvoidance = true;
-
-    int boidAmt;
-    cout << "How many boids should be displayed? \n";
-    cin >> boidAmt;
-
-    Boid boidList[boidAmt];
-
     /* initialize random seed: */
     srand (time(NULL));
 
@@ -96,113 +203,33 @@ int main()
 
         window.clear();
 
+        std::thread t1(calcBoid, 0, 10);
+        std::thread t2(calcBoid, 1, 10);
+        std::thread t3(calcBoid, 2, 10);
+        std::thread t4(calcBoid, 3, 10);
+        std::thread t5(calcBoid, 4, 10);
+        std::thread t6(calcBoid, 5, 10);
+        std::thread t7(calcBoid, 6, 10);
+        std::thread t8(calcBoid, 7, 10);
+        std::thread t9(calcBoid, 8, 10);
+        std::thread t10(calcBoid, 9, 10);
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+        t5.join();
+        t6.join();
+        t7.join();
+        t8.join();
+        t9.join();
+        t10.join();
+
         for (int i = 0; i < boidAmt; i++) {
             Boid &boid = boidList[i];
 
-            // Flock variables
-            int boidsInFlockRange = 0;
-            double totalFlockVector[2] = {0, 0};
-            double averageFlockCords[2] = {0, 0}; 
-
-            for (int j = 0; j < boidAmt; j++) {
-                Boid &boidToCheck = boidList[j];
-
-                if (boid.boidNumber != boidToCheck.boidNumber) {
-                    const double vectorToBoid[2] = {boidToCheck.cordinates[0] - boid.cordinates[0], boidToCheck.cordinates[1] - boid.cordinates[1]};
-                    const double distanceToBoid = sqrt(pow(vectorToBoid[0], 2) + pow(vectorToBoid[1], 2));
-                    double directionToBoid = atan(vectorToBoid[0] / vectorToBoid[1]);
-                    if (vectorToBoid[1] < 0) {
-                        if (vectorToBoid[1] == 0) {
-                            if (vectorToBoid[0] > 0) {
-                                directionToBoid = PI / 2;
-                            } else {
-                                directionToBoid = -PI / 2;
-                            }
-                        }
-                        else if (vectorToBoid[0] > 0) {
-                            directionToBoid = PIlib / 2 + (PIlib / 2 + directionToBoid);
-                        } else {
-                            directionToBoid = - (PIlib / 2) - (PIlib / 2 - directionToBoid);
-                        }
-                    }
-
-                    // // Avoid other boids code
-                    if (distanceToBoid < collisionAvoidanceDistance && collisionAvoidance) {
-                        const float boidDirection = boid.direction();
-                        if (directionToBoid > boidDirection - viewAmt && directionToBoid < boidDirection + viewAmt) {
-                            if (directionToBoid > boidDirection) {
-                                boid.setVector(boidDirection - ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
-                            } else {
-                                boid.setVector(boidDirection + ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
-                            }
-                        } 
-                        else if (PI + directionToBoid + PI - boidDirection < viewAmt) {
-                            boid.setVector(boidDirection - ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
-                        }
-                        else if (PI - directionToBoid + PI + boidDirection < viewAmt) {
-                            boid.setVector(boidDirection + ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
-                        } else if (distanceToBoid < alwaysAvoid) {
-                            if (directionToBoid > boidDirection) {
-                                boid.setVector(boidDirection - ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
-                            } else {
-                                boid.setVector(boidDirection + ((collisionAvoidanceDistance - distanceToBoid) * avoidanceScale), boid.magnitude());
-                            }
-                        }
-                    }
-
-                    if (distanceToBoid < flockDetectionRadius) {
-                        boidsInFlockRange ++;
-                        totalFlockVector[0] += boidToCheck.vector[0];
-                        totalFlockVector[1] += boidToCheck.vector[1];
-                        averageFlockCords[0] += boidToCheck.cordinates[0];
-                        averageFlockCords[1] += boidToCheck.cordinates[1];
-                    }
-                }
-            }
-
-            if (boidsInFlockRange > 0) {
-                boid.vector[0] += ((totalFlockVector[0] / boidsInFlockRange) -  boid.vector[0]) * alignmentScale;
-                boid.vector[1] += ((totalFlockVector[1] / boidsInFlockRange) -  boid.vector[1]) * alignmentScale;
-                boid.vector[0] += boid.vector[0] * alignmentScale;
-                boid.vector[1] += boid.vector[1] * alignmentScale;
-            }
-
-            const double distanceToCenter = sqrt(pow((double)(boid.cordinates[0] - windowWidth / 2), (double)2) + pow((double)(boid.cordinates[1] - windowHeight / 2), (double)2));
-
-            if (distanceToCenter > 450) {
-                if (boid.cordinates[0] < windowWidth / 2) {
-                    // left x
-                    boid.vector[0] += borderDeflectionScale;
-                } else {
-                    boid.vector[0] -= borderDeflectionScale;
-                }
-                if (boid.cordinates[1] < windowHeight / 2) {
-                    // left x
-                    boid.vector[1] += borderDeflectionScale;
-                } else {
-                    boid.vector[1] -= borderDeflectionScale;
-                }
-                // for cicle thingo
-                // if (boid.distanceToCenter < distanceToCenter) {
-                //     boid.setVector(boid.direction() + borderDeflectionScale, maxMagnitude);
-                //     boid.distanceToCenter = distanceToCenter;
-                // }
-            }
-
-            if (boid.magnitude() > maxMagnitude) {
-                boid.setVector(boid.direction(), maxMagnitude);
-            }
-
-            if (boidsInFlockRange > 0) {
-                boid.vector[0] += cohesionAmt * ((averageFlockCords[0] / boidsInFlockRange) - boid.cordinates[0]);
-                boid.vector[1] += cohesionAmt * ((averageFlockCords[1] / boidsInFlockRange) - boid.cordinates[1]);
-            }
-            
-            boid.move();
-
             // Draw Boid
             boidDraw.setPosition(boid.cordinates[0] - boidDrawScale, boid.cordinates[1] - boidDrawScale);
-            boidDraw.setFillColor(sf::Color{(sf::Uint8)((boidsInFlockRange * 2) + 40), (sf::Uint8)(boid.cordinates[0] / 8), (sf::Uint8)(boid.cordinates[1] / 8)});
+            boidDraw.setFillColor(sf::Color{(sf::Uint8)(255), (sf::Uint8)(boid.cordinates[0] / 8), (sf::Uint8)(boid.cordinates[1] / 8)});
             window.draw(boidDraw);
 
             // Draw Vector
